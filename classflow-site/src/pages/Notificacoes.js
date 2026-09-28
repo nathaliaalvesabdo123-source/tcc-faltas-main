@@ -1,94 +1,63 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Header from '../components/Header';
-import { 
-  Bell, 
-  AlertCircle, 
-  CheckCircle, 
-  Info, 
-  XCircle,
-  Filter,
-  Clock
-} from 'lucide-react';
+import { Bell, AlertCircle, CheckCircle, Info, Clock, XCircle } from 'lucide-react';
 
 function Notificacoes() {
+  const [notificacoes, setNotificacoes] = useState([]);
   const [filtro, setFiltro] = useState('todas');
+  const [carregando, setCarregando] = useState(true);
 
-  // Dados mockados (depois vem do backend)
-  const notificacoes = [
-    { 
-      id: 1, 
-      tipo: 'alerta', 
-      mensagem: 'Você está com 20% de faltas em Matemática. Atenção!', 
-      data: '2025-08-15T08:30:00', 
-      lida: false,
-      link: '/frequencia'
-    },
-    { 
-      id: 2, 
-      tipo: 'informativo', 
-      mensagem: 'A prova de Português foi remarcada para o dia 20/08.', 
-      data: '2025-08-14T14:20:00', 
-      lida: false,
-      link: null
-    },
-    { 
-      id: 3, 
-      tipo: 'alerta', 
-      mensagem: 'Você atingiu 25% de faltas em Física. Procure a coordenação.', 
-      data: '2025-08-12T09:15:00', 
-      lida: true,
-      link: '/frequencia'
-    },
-    { 
-      id: 4, 
-      tipo: 'informativo', 
-      mensagem: 'Aulas normais na próxima semana. Confira o calendário.', 
-      data: '2025-08-10T16:00:00', 
-      lida: true,
-      link: null
-    },
-    { 
-      id: 5, 
-      tipo: 'alerta', 
-      mensagem: 'Você está com 18% de faltas em Química. Fique atento!', 
-      data: '2025-08-08T07:45:00', 
-      lida: false,
-      link: '/frequencia'
-    },
-    { 
-      id: 6, 
-      tipo: 'sucesso', 
-      mensagem: 'Sua falta em História foi justificada com sucesso.', 
-      data: '2025-08-07T11:30:00', 
-      lida: true,
-      link: null
-    },
-  ];
+  useEffect(() => {
+    const usuarioSalvo = localStorage.getItem('usuario');
+    if (usuarioSalvo) {
+      const user = JSON.parse(usuarioSalvo);
+      buscarNotificacoes(user.id);
+    }
+  }, []);
 
-  const notificacoesFiltradas = notificacoes.filter(not => {
+  const buscarNotificacoes = async (usuarioId) => {
+    try {
+      const response = await fetch(`http://localhost:3000/notificacoes/${usuarioId}`);
+      const data = await response.json();
+      setNotificacoes(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Erro ao buscar notificações:', error);
+    } finally {
+      setCarregando(false);
+    }
+  };
+
+  const marcarComoLida = async (id) => {
+    try {
+      await fetch(`http://localhost:3000/notificacoes/${id}/lida`, { method: 'PUT' });
+      setNotificacoes(notificacoes.map(n => n.id === id ? { ...n, lida: 1 } : n));
+    } catch (error) {
+      console.error('Erro:', error);
+    }
+  };
+
+  const notificacoesFiltradas = notificacoes.filter(n => {
     if (filtro === 'todas') return true;
-    if (filtro === 'nao-lidas') return !not.lida;
-    if (filtro === 'lidas') return not.lida;
+    if (filtro === 'nao-lidas') return !n.lida;
+    if (filtro === 'lidas') return n.lida;
     return true;
   });
 
   const getIcon = (tipo) => {
     switch (tipo) {
-      case 'alerta':
-        return <AlertCircle size={20} color="#e53e3e" />;
-      case 'informativo':
-        return <Info size={20} color="#3182ce" />;
-      case 'sucesso':
-        return <CheckCircle size={20} color="#00b4a0" />;
-      default:
-        return <Bell size={20} color="#4a5568" />;
+      case 'reprovacao': return <XCircle size={20} color="#e53e3e" />;
+      case 'alerta': return <AlertCircle size={20} color="#ed8936" />;
+      case 'registro': return <Info size={20} color="#3182ce" />;
+      case 'sucesso': return <CheckCircle size={20} color="#00b4a0" />;
+      default: return <Bell size={20} color="#718096" />;
     }
   };
 
   const getTipoLabel = (tipo) => {
     switch (tipo) {
+      case 'reprovacao': return 'Reprovação';
       case 'alerta': return 'Alerta';
-      case 'informativo': return 'Informativo';
+      case 'registro': return 'Registro';
       case 'sucesso': return 'Sucesso';
       default: return 'Notificação';
     }
@@ -105,11 +74,25 @@ function Notificacoes() {
     } else if (data.toDateString() === ontem.toDateString()) {
       return `Ontem às ${data.getHours().toString().padStart(2, '0')}:${data.getMinutes().toString().padStart(2, '0')}`;
     } else {
-      return `${data.getDate().toString().padStart(2, '0')}/${(data.getMonth()+1).toString().padStart(2, '0')}/${data.getFullYear()}`;
+      return `${data.getDate().toString().padStart(2, '0')}/${(data.getMonth() + 1).toString().padStart(2, '0')}/${data.getFullYear()}`;
     }
   };
 
   const contarNaoLidas = notificacoes.filter(n => !n.lida).length;
+
+  if (carregando) {
+    return (
+      <>
+        <Header />
+        <div className="page-container">
+          <div className="page-header">
+            <h1>Notificações</h1>
+            <p>Carregando...</p>
+          </div>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
@@ -130,7 +113,6 @@ function Notificacoes() {
           </div>
         </div>
 
-        {/* FILTROS */}
         <div className="filtros-container">
           <div className="filtros-botoes">
             <button 
@@ -154,7 +136,6 @@ function Notificacoes() {
           </div>
         </div>
 
-        {/* LISTA DE NOTIFICAÇÕES */}
         <div className="notificacoes-lista">
           {notificacoesFiltradas.length === 0 ? (
             <div className="empty-state">
@@ -167,6 +148,8 @@ function Notificacoes() {
               <div 
                 key={not.id} 
                 className={`notificacao-item ${!not.lida ? 'nao-lida' : ''}`}
+                onClick={() => !not.lida && marcarComoLida(not.id)}
+                style={{ cursor: !not.lida ? 'pointer' : 'default' }}
               >
                 <div className="notificacao-icon">
                   {getIcon(not.tipo)}
@@ -175,19 +158,15 @@ function Notificacoes() {
                 <div className="notificacao-conteudo">
                   <div className="notificacao-header">
                     <span className="notificacao-tipo">{getTipoLabel(not.tipo)}</span>
-                    {!not.lida && <span className="notificacao-badge">Nova</span>}
+                
                   </div>
+                  <p><strong>{not.titulo}</strong></p>
                   <p>{not.mensagem}</p>
                   <div className="notificacao-footer">
                     <span className="notificacao-data">
                       <Clock size={14} />
-                      {formatarData(not.data)}
+                      {formatarData(not.data_criacao)}
                     </span>
-                    {not.link && (
-                      <a href={not.link} className="notificacao-link">
-                        Ver detalhes →
-                      </a>
-                    )}
                   </div>
                 </div>
               </div>

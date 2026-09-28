@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './App.css';
 import Login from './pages/login';
 import Cadastro from './pages/cadastro';
@@ -13,6 +13,15 @@ import Perfil from './pages/Perfil';
 
 function App() {
   const [tela, setTela] = useState('login');
+
+  // Escuta o evento global "mudarTela" disparado pelo Header (clique no perfil)
+  useEffect(() => {
+    const handleMudarTela = (e) => {
+      setTela(e.detail);
+    };
+    window.addEventListener('mudarTela', handleMudarTela);
+    return () => window.removeEventListener('mudarTela', handleMudarTela);
+  }, []);
 
   // Mapeamento de telas para o conteúdo que vai dentro da Sidebar
   const telasComSidebar = {
