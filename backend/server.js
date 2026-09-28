@@ -689,6 +689,46 @@ app.post('/faltas-dia-todo', (req, res) => {
         });
     });
 });
+// ===== ROTA PARA BUSCAR ESTATÍSTICAS DE DIAS =====
+app.get('/estatisticas/:usuario_id', (req, res) => {
+    const { usuario_id } = req.params;
+
+    // 1. Contar dias letivos que já passaram
+    const sqlDiasLetivos = `
+        SELECT COUNT(*) as total_dias
+        FROM dias_letivos
+        WHERE data <= CURDATE() AND tipo = 'letivo'
+    `;
+
+    db.query(sqlDiasLetivos, (err, diasResult) => {
+        if (err) return res.status(500).json({ erro: err.message });
+
+        const totalDiasLetivos = diasResult[0]?.total_dias || 0;
+
+        // 2. Contar dias com falta (agrupando por data)
+        const sqlDiasComFalta = `
+            SELECT COUNT(DISTINCT data) as dias_com_falta
+            FROM faltas
+            WHERE usuario_id = ?
+        `;
+
+        db.query(sqlDiasComFalta, [usuario_id], (err, faltasResult) => {
+            if (err) return res.status(500).json({ erro: err.message });
+
+            const diasComFalta = faltasResult[0]?.dias_com_falta || 0;
+            const diasPresentes = totalDiasLetivos - diasComFalta;
+
+            res.json({
+                totalDiasLetivos,
+                diasComFalta,
+                diasPresentes,
+                frequencia: totalDiasLetivos > 0 
+                    ? Math.round((diasPresentes / totalDiasLetivos) * 100) 
+                    : 0
+            });
+        });
+    });
+});
 
 // ===== INICIAR O SERVIDOR =====
 const PORT = 3000;

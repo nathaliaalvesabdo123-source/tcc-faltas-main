@@ -9,7 +9,7 @@ import MotivationCard from '../components/MotivationCard';
 
 function Dashboard() {
   const [usuario, setUsuario] = useState(null);
-  const [dadosFrequencia, setDadosFrequencia] = useState(null);
+  const [stats, setStats] = useState(null);
   const [carregando, setCarregando] = useState(true);
 
   useEffect(() => {
@@ -17,44 +17,46 @@ function Dashboard() {
     if (usuarioSalvo) {
       const user = JSON.parse(usuarioSalvo);
       setUsuario(user);
-      buscarDadosFrequencia(user.id);
+      buscarEstatisticas(user.id);
     } else {
-      // Se não tiver usuário, redireciona para o login
       window.location.href = '/';
     }
   }, []);
 
-  const buscarDadosFrequencia = async (usuarioId) => {
+  const buscarEstatisticas = async (usuarioId) => {
     try {
-      const response = await fetch(`http://localhost:3000/frequencia/${usuarioId}`);
+      const response = await fetch(`http://localhost:3000/estatisticas/${usuarioId}`);
       const data = await response.json();
-      setDadosFrequencia(data);
+      setStats(data);
     } catch (error) {
-      console.error('Erro ao buscar frequência:', error);
+      console.error('Erro ao buscar estatísticas:', error);
     } finally {
       setCarregando(false);
     }
   };
 
-  if (carregando || !usuario) {
+  if (carregando || !usuario || !stats) {
     return (
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        height: '100vh',
-        fontSize: '18px',
-        color: '#718096'
-      }}>
-        Carregando...
-      </div>
+      <>
+        <Header />
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          height: '80vh',
+          fontSize: '18px',
+          color: '#718096'
+        }}>
+          Carregando...
+        </div>
+      </>
     );
   }
 
-  const totalAulas = dadosFrequencia?.total_aulas || 0;
-  const totalFaltas = dadosFrequencia?.total_faltas || 0;
-  const presencas = totalAulas - totalFaltas;
-  const frequencia = totalAulas > 0 ? Math.round((presencas / totalAulas) * 100) : 0;
+  const { totalDiasLetivos, diasComFalta, diasPresentes, frequencia } = stats;
+  const percentualFaltas = totalDiasLetivos > 0 
+    ? Math.round((diasComFalta / totalDiasLetivos) * 100) 
+    : 0;
 
   return (
     <>
@@ -63,33 +65,33 @@ function Dashboard() {
         <WelcomeSection nome={usuario.nome} />
 
         <div className="stats-grid">
-          <StatCard 
-            icone="calendar" 
-            cor="#e8f8f5" 
-            titulo="Total de aulas" 
-            valor={totalAulas} 
-            subtitulo="registradas" 
+          <StatCard
+            icone="calendar"
+            cor="#e8f8f5"
+            titulo="Total de dias letivos"
+            valor={totalDiasLetivos}
+            subtitulo="até hoje"
           />
-          <StatCard 
-            icone="check" 
-            cor="#d0f0ec" 
-            titulo="Aulas presentes" 
-            valor={presencas} 
-            subtitulo={`${frequencia}% de frequência`} 
+          <StatCard
+            icone="check"
+            cor="#d0f0ec"
+            titulo="Dias presentes"
+            valor={diasPresentes}
+            subtitulo={`${frequencia}% de frequência`}
           />
-          <StatCard 
-            icone="x" 
-            cor="#fde8e8" 
-            titulo="Faltas" 
-            valor={totalFaltas} 
-            subtitulo={`${totalAulas > 0 ? Math.round((totalFaltas / totalAulas) * 100) : 0}% de faltas`} 
+          <StatCard
+            icone="x"
+            cor="#fde8e8"
+            titulo="Dias com falta"
+            valor={diasComFalta}
+            subtitulo={`${percentualFaltas}% de faltas`}
           />
-          <StatCard 
-            icone="clock" 
-            cor="#fff3e0" 
-            titulo="Atrasos" 
-            valor="0" 
-            subtitulo="0% de atrasos" 
+          <StatCard
+            icone="clock"
+            cor="#fff3e0"
+            titulo="Atrasos"
+            valor="0"
+            subtitulo="0% de atrasos"
           />
         </div>
 
