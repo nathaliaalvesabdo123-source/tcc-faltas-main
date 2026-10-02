@@ -3965,3 +3965,181 @@ body.tema-escuro .resultado-status.reprovado {
   object-fit: cover;
   border: 2px solid #00b4a0;
 }
+
+/* ===== CALENDÁRIO - FERIADOS ===== */
+.calendar-dia.vazio {
+  background: transparent;
+  cursor: default;
+}
+
+.calendar-dia.feriado {
+  background: #f0f0f0;
+  color: #999;
+  font-weight: 500;
+}
+
+.calendar-feriados {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.calendar-feriados-titulo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #4a5568;
+  margin-bottom: 8px;
+}
+
+.calendar-feriados-lista {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.calendar-feriados-lista li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  background: #f7fafc;
+  color: #2d3748;
+}
+
+.calendar-feriados-lista li.feriado {
+  border-left: 3px solid #ff6b6b;
+}
+
+.calendar-feriados-lista li.recesso {
+  border-left: 3px solid #ffa94d;
+}
+
+.calendar-feriados-lista li strong {
+  color: #1a202c;
+  font-size: 12px;
+  min-width: 42px;
+}
+
+.calendar-feriados-lista li span {
+  color: #4a5568;
+}
+
+/* Modo escuro */
+body.tema-escuro .calendar-dia.feriado {
+  background: #1a3d36;
+  color: #8ab8ae;
+}
+
+body.tema-escuro .calendar-feriados {
+  border-color: #1f3d38;
+}
+
+body.tema-escuro .calendar-feriados-titulo {
+  color: #8ab8ae;
+}
+
+body.tema-escuro .calendar-feriados-lista li {
+  background: #142824;
+  color: #c8e0da;
+}
+
+body.tema-escuro .calendar-feriados-lista li strong {
+  color: #e0f0ed;
+}
+
+body.tema-escuro .calendar-feriados-lista li span {
+  color: #8ab8ae;
+}
+/* ===== SIMULAÇÃO - AVISO DE ERRO ===== */
+.resultado-erro {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+  background: #fff5f5;
+  border-radius: 16px;
+  border: 1px solid #fed7d7;
+  animation: shakeError 0.5s ease-in-out;
+}
+
+@keyframes shakeError {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
+}
+
+.resultado-erro-icon {
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  background: #fed7d7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.resultado-erro h4 {
+  font-size: 18px;
+  font-weight: 700;
+  color: #c53030;
+  margin: 0 0 8px 0;
+}
+
+.resultado-erro p {
+  font-size: 14px;
+  color: #742a2a;
+  line-height: 1.5;
+  max-width: 320px;
+  margin: 0 0 20px 0;
+}
+
+.resultado-erro-dica {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: white;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 12px;
+  color: #718096;
+  border: 1px solid #fed7d7;
+}
+
+/* Modo escuro */
+body.tema-escuro .resultado-erro {
+  background: #3d1a1a;
+  border-color: #5d2a2a;
+}
+
+body.tema-escuro .resultado-erro-icon {
+  background: #5d2a2a;
+}
+
+body.tema-escuro .resultado-erro h4 {
+  color: #f0a0a0;
+}
+
+body.tema-escuro .resultado-erro p {
+  color: #e0c0c0;
+}
+
+body.tema-escuro .resultado-erro-dica {
+  background: #1a3d36;
+  border-color: #5d2a2a;
+  color: #c8e0da;
+}

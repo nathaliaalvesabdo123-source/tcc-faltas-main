@@ -44,8 +44,9 @@ function Perfil() {
       const data = await response.json();
       if (data.foto) {
         setFotoPerfil(data.foto);
-        // Atualiza o localStorage com a foto pra aparecer no header
-        const usuarioAtualizado = { ...usuario, foto: data.foto };
+        // Atualiza o localStorage SEM perder os outros dados
+        const usuarioAtual = JSON.parse(localStorage.getItem('usuario')) || {};
+        const usuarioAtualizado = { ...usuarioAtual, foto: data.foto };
         localStorage.setItem('usuario', JSON.stringify(usuarioAtualizado));
         setUsuario(usuarioAtualizado);
       }
@@ -105,8 +106,9 @@ function Perfil() {
         });
 
         if (response.ok) {
-          // Atualiza o localStorage com a nova foto
-          const usuarioAtualizado = { ...usuario, foto: base64 };
+          // Atualiza o localStorage SEM perder os outros dados
+          const usuarioAtual = JSON.parse(localStorage.getItem('usuario')) || {};
+          const usuarioAtualizado = { ...usuarioAtual, foto: base64 };
           localStorage.setItem('usuario', JSON.stringify(usuarioAtualizado));
           setUsuario(usuarioAtualizado);
 
@@ -124,7 +126,9 @@ function Perfil() {
   };
 
   const handleSave = () => {
-    const usuarioAtualizado = { ...usuario, ...dadosEditaveis };
+    // Atualiza o localStorage SEM perder os outros dados
+    const usuarioAtual = JSON.parse(localStorage.getItem('usuario')) || {};
+    const usuarioAtualizado = { ...usuarioAtual, ...dadosEditaveis };
     localStorage.setItem('usuario', JSON.stringify(usuarioAtualizado));
     setUsuario(usuarioAtualizado);
     setEditando(false);

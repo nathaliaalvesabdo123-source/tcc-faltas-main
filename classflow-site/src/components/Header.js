@@ -10,11 +10,14 @@ function Header() {
   useEffect(() => {
     const usuarioSalvo = localStorage.getItem('usuario');
     if (usuarioSalvo) {
-      setUsuario(JSON.parse(usuarioSalvo));
+      try {
+        setUsuario(JSON.parse(usuarioSalvo));
+      } catch (e) {
+        console.error('Erro ao ler usuario:', e);
+      }
     }
   }, []);
 
-  // Pega as iniciais do nome
   const getIniciais = (nome) => {
     if (!nome) return '??';
     const partes = nome.trim().split(' ');
@@ -22,20 +25,16 @@ function Header() {
     return (partes[0][0] + partes[partes.length - 1][0]).toUpperCase();
   };
 
-  // Pega a foto do usuário (se tiver)
   const fotoPerfil = usuario?.foto;
 
-  // Abre notificações
   const handleNotificacoesClick = () => {
     window.dispatchEvent(new CustomEvent('mudarTela', { detail: 'notificacoes' }));
   };
 
-  // Abre perfil
   const handlePerfilClick = () => {
     window.dispatchEvent(new CustomEvent('mudarTela', { detail: 'perfil' }));
   };
 
-  // Busca em tempo real (dispara evento global)
   const handleBusca = (valor) => {
     setBusca(valor);
     window.dispatchEvent(new CustomEvent('buscar', { detail: valor }));
@@ -76,7 +75,6 @@ function Header() {
           onClick={handlePerfilClick}
           style={{ cursor: 'pointer' }}
         >
-          {/* SE TIVER FOTO, MOSTRA A FOTO, SENÃO AS INICIAIS */}
           {fotoPerfil ? (
             <img src={fotoPerfil} alt="Perfil" className="avatar avatar-img" />
           ) : (

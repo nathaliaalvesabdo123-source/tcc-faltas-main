@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -24,12 +24,74 @@ ChartJS.register(
 );
 
 function AttendanceChart() {
-  const data = {
-    labels: ['Maio', 'Junho', 'Julho', 'Agosto'],
+  const [dados, setDados] = useState([]);
+  const [carregando, setCarregando] = useState(true);
+
+  useEffect(() => {
+    const usuarioSalvo = localStorage.getItem('usuario');
+    if (usuarioSalvo) {
+      const user = JSON.parse(usuarioSalvo);
+      buscarDados(user.id);
+    } else {
+      setCarregando(false);
+    }
+  }, []);
+
+  const buscarDados = async (usuarioId) => {
+    try {
+      const response = await fetch(`http://localhost:3000/frequencia-mensal/${usuarioId}`);
+      const data = await response.json();
+      setDados(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Erro ao buscar frequência mensal:', error);
+      setDados([]);
+    } finally {
+      setCarregando(false);
+    }
+  };
+
+  if (carregando) {
+    return (
+      <div className="chart-card">
+        <h3>Sua frequência nos últimos 4 meses</h3>
+        <div
+          className="chart-container"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <span style={{ color: '#718096' }}>Carregando...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (dados.length === 0) {
+    return (
+      <div className="chart-card">
+        <h3>Sua frequência nos últimos 4 meses</h3>
+        <div
+          className="chart-container"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <span style={{ color: '#718096' }}>Sem dados disponíveis</span>
+        </div>
+      </div>
+    );
+  }
+
+  const chartData = {
+    labels: dados.map((d) => d.mes),
     datasets: [
       {
         label: 'Frequência (%)',
-        data: [42, 55, 72, 87],
+        data: dados.map((d) => d.frequencia),
         borderColor: '#00b4a0',
         backgroundColor: 'rgba(0, 180, 160, 0.10)',
         fill: true,
@@ -59,11 +121,17 @@ function AttendanceChart() {
         cornerRadius: 12,
         padding: 12,
         callbacks: {
-          label: function(context) {
-            return context.parsed.y + '%';
-          }
-        }
-      }
+          label: function (context) {
+            const index = context.dataIndex;
+            const mes = dados[index];
+            return [
+              `Frequência: ${context.parsed.y}%`,
+              `Faltas: ${mes.faltas} dia(s)`,
+              `Dias letivos: ${mes.totalAulas}`,
+            ];
+          },
+        },
+      },
     },
     scales: {
       y: {
@@ -72,10 +140,7 @@ function AttendanceChart() {
         ticks: {
           stepSize: 20,
           callback: (value) => value + '%',
-          font: {
-            size: 12,
-            weight: '500',
-          },
+          font: { size: 12, weight: '500' },
           color: '#718096',
         },
         grid: {
@@ -88,10 +153,7 @@ function AttendanceChart() {
           display: false,
         },
         ticks: {
-          font: {
-            size: 13,
-            weight: '600',
-          },
+          font: { size: 13, weight: '600' },
           color: '#4a5568',
         },
       },
@@ -107,7 +169,7 @@ function AttendanceChart() {
     <div className="chart-card">
       <h3>Sua frequência nos últimos 4 meses</h3>
       <div className="chart-container">
-        <Line data={data} options={options} />
+        <Line data={chartData} options={options} />
       </div>
     </div>
   );

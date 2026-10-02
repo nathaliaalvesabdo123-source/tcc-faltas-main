@@ -27,7 +27,6 @@ db.connect((err) => {
 // ===== FUNÇÕES AUXILIARES ===================================
 // ============================================================
 
-// Cria uma notificação no banco
 function criarNotificacao(usuarioId, tipo, titulo, mensagem) {
     const sql = 'INSERT INTO notificacoes (usuario_id, tipo, titulo, mensagem) VALUES (?, ?, ?, ?)';
     db.query(sql, [usuarioId, tipo, titulo, mensagem], (err) => {
@@ -35,7 +34,6 @@ function criarNotificacao(usuarioId, tipo, titulo, mensagem) {
     });
 }
 
-// Verifica se o aluno está com 20% ou 25% de faltas em alguma disciplina
 function verificarAlertas(usuarioId) {
     db.query('SELECT turma, instituicao FROM usuarios WHERE id = ?', [usuarioId], (err, userResult) => {
         if (err || userResult.length === 0) return;
@@ -83,7 +81,6 @@ function verificarAlertas(usuarioId) {
                                         : 100;
                                     const percentualFaltas = 100 - frequencia;
 
-                                    // 25% = REPROVADO
                                     if (percentualFaltas >= 25) {
                                         db.query(
                                             `SELECT id FROM notificacoes 
@@ -103,7 +100,6 @@ function verificarAlertas(usuarioId) {
                                             }
                                         );
                                     }
-                                    // 20% = ALERTA
                                     else if (percentualFaltas >= 20) {
                                         db.query(
                                             `SELECT id FROM notificacoes 
@@ -137,12 +133,11 @@ function verificarAlertas(usuarioId) {
 // ===== ROTAS ================================================
 // ============================================================
 
-// ===== ROTA DE TESTE =====
 app.get('/', (req, res) => {
     res.json({ mensagem: '🚀 API do ClassFlow rodando!' });
 });
 
-// ===== ROTA DE CADASTRO =====
+// ===== CADASTRO =====
 app.post('/cadastrar', (req, res) => {
     const { nome, email, senha, instituicao, turma } = req.body;
 
@@ -168,7 +163,7 @@ app.post('/cadastrar', (req, res) => {
     });
 });
 
-// ===== ROTA DE LOGIN =====
+// ===== LOGIN =====
 app.post('/login', (req, res) => {
     const { email, senha } = req.body;
 
@@ -185,14 +180,13 @@ app.post('/login', (req, res) => {
             return res.status(401).json({ erro: 'Email ou senha inválidos' });
         }
 
-        // Ao logar, verificar alertas automaticamente
         verificarAlertas(results[0].id);
 
         res.json(results[0]);
     });
 });
 
-// ===== ROTA PARA LISTAR USUÁRIOS =====
+// ===== LISTAR USUÁRIOS =====
 app.get('/usuarios', (req, res) => {
     db.query('SELECT id, nome, email, instituicao, turma FROM usuarios', (err, results) => {
         if (err) {
@@ -203,7 +197,7 @@ app.get('/usuarios', (req, res) => {
     });
 });
 
-// ===== ROTA PARA BUSCAR USUÁRIO COMPLETO (COM FOTO) =====
+// ===== BUSCAR USUÁRIO COMPLETO =====
 app.get('/usuario/:usuario_id', (req, res) => {
     const { usuario_id } = req.params;
 
@@ -215,7 +209,7 @@ app.get('/usuario/:usuario_id', (req, res) => {
     });
 });
 
-// ===== ROTA PARA SALVAR FOTO DO USUÁRIO =====
+// ===== SALVAR FOTO =====
 app.post('/usuario/foto/:usuario_id', (req, res) => {
     const { usuario_id } = req.params;
     const { foto } = req.body;
@@ -231,7 +225,7 @@ app.post('/usuario/foto/:usuario_id', (req, res) => {
     });
 });
 
-// ===== ROTA PARA BUSCAR DISCIPLINAS DA TURMA DO ALUNO POR INSTITUIÇÃO =====
+// ===== DISCIPLINAS DA TURMA =====
 app.get('/disciplinas/:usuario_id/:instituicao', (req, res) => {
     const { usuario_id, instituicao } = req.params;
 
@@ -257,7 +251,7 @@ app.get('/disciplinas/:usuario_id/:instituicao', (req, res) => {
     });
 });
 
-// ===== ROTA PARA LANÇAR FALTA =====
+// ===== LANÇAR FALTA =====
 app.post('/faltas', (req, res) => {
     const { usuario_id, disciplina, data, horario, justificativa, instituicao } = req.body;
 
@@ -272,7 +266,6 @@ app.post('/faltas', (req, res) => {
             return;
         }
 
-        // Notificação de falta registrada
         criarNotificacao(
             usuario_id,
             'registro',
@@ -280,7 +273,6 @@ app.post('/faltas', (req, res) => {
             `Sua falta em ${disciplina} (${instituicao}) no dia ${data} foi registrada.`
         );
 
-        // Verificar alertas de frequência
         verificarAlertas(usuario_id);
 
         res.status(201).json({
@@ -290,7 +282,76 @@ app.post('/faltas', (req, res) => {
     });
 });
 
-// ===== ROTA PARA LISTAR FALTAS DE UM USUÁRIO =====
+// ===== LANÇAR FALTA EM DIA TODO =====
+app.post('/faltas-dia-todo', (req, res) => {
+    const { usuario_id, data, instituicao } = req.body;
+
+    if (!usuario_id || !data || !instituicao) {
+        return res.status(400).json({ erro: 'Usuário, data e instituição são obrigatórios' });
+    }
+
+    const dataObj = new Date(data + 'T00:00:00');
+    const diasSemana = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+    const diaSemana = diasSemana[dataObj.getDay()];
+
+    if (diaSemana === 'Sábado' || diaSemana === 'Domingo') {
+        return res.status(400).json({ erro: 'Não há aulas nos fins de semana' });
+    }
+
+    db.query('SELECT turma FROM usuarios WHERE id = ?', [usuario_id], (err, userResult) => {
+        if (err) return res.status(500).json({ erro: err.message });
+        if (userResult.length === 0) return res.status(404).json({ erro: 'Usuário não encontrado' });
+
+        const turma = userResult[0].turma;
+
+        const sqlAulas = `
+            SELECT a.disciplina, a.bloco, a.horario_inicio, a.horario_fim
+            FROM aulas a
+            JOIN turmas t ON a.turma_id = t.id
+            WHERE t.nome = ? AND t.instituicao = ? AND t.ano_letivo = YEAR(CURDATE())
+                AND a.dia_semana = ?
+            ORDER BY a.bloco
+        `;
+
+        db.query(sqlAulas, [turma, instituicao, diaSemana], (err, aulasResult) => {
+            if (err) return res.status(500).json({ erro: err.message });
+            if (aulasResult.length === 0) {
+                return res.status(400).json({ erro: `Não há aulas de ${instituicao} nesse dia (${diaSemana})` });
+            }
+
+            const faltas = aulasResult.map(aula => [
+                usuario_id,
+                aula.disciplina,
+                data,
+                `${aula.horario_inicio} - ${aula.horario_fim}`,
+                'Falta em dia todo',
+                instituicao
+            ]);
+
+            const sqlInsert = 'INSERT INTO faltas (usuario_id, disciplina, data, horario, justificativa, instituicao) VALUES ?';
+
+            db.query(sqlInsert, [faltas], (err, result) => {
+                if (err) return res.status(500).json({ erro: err.message });
+
+                criarNotificacao(
+                    usuario_id,
+                    'registro',
+                    '📝 Falta em dia todo registrada',
+                    `Sua falta em dia todo (${instituicao}) no dia ${data} foi registrada (${aulasResult.length} aulas).`
+                );
+
+                verificarAlertas(usuario_id);
+
+                res.status(201).json({
+                    message: `${aulasResult.length} faltas lançadas com sucesso!`,
+                    total: aulasResult.length
+                });
+            });
+        });
+    });
+});
+
+// ===== LISTAR FALTAS DE UM USUÁRIO =====
 app.get('/faltas/:usuario_id', (req, res) => {
     const sql = 'SELECT * FROM faltas WHERE usuario_id = ? ORDER BY data DESC';
     db.query(sql, [req.params.usuario_id], (err, results) => {
@@ -302,7 +363,7 @@ app.get('/faltas/:usuario_id', (req, res) => {
     });
 });
 
-// ===== ROTA PARA BUSCAR HORÁRIO DO USUÁRIO =====
+// ===== HORÁRIO DO USUÁRIO =====
 app.get('/horario/:usuario_id', (req, res) => {
     const usuarioId = req.params.usuario_id;
 
@@ -331,7 +392,7 @@ app.get('/horario/:usuario_id', (req, res) => {
     });
 });
 
-// ===== ROTA PARA FREQUÊNCIA COMPLETA (SEPARADA POR INSTITUIÇÃO) =====
+// ===== FREQUÊNCIA COMPLETA =====
 app.get('/frequencia-completa/:usuario_id', (req, res) => {
     const usuarioId = req.params.usuario_id;
 
@@ -462,81 +523,127 @@ app.get('/frequencia-completa/:usuario_id', (req, res) => {
     });
 });
 
-// ===== ROTA PARA FREQUÊNCIA MENSAL =====
-app.get('/frequencia-mensal/:usuario_id', (req, res) => {
-    const usuarioId = req.params.usuario_id;
+// ===== ESTATÍSTICAS POR DIAS =====
+app.get('/estatisticas/:usuario_id', (req, res) => {
+    const { usuario_id } = req.params;
 
-    const sqlUsuario = 'SELECT turma, instituicao FROM usuarios WHERE id = ?';
-    db.query(sqlUsuario, [usuarioId], (err, userResult) => {
+    const sqlDiasLetivos = `
+        SELECT COUNT(*) as total_dias
+        FROM dias_letivos
+        WHERE data <= CURDATE() AND tipo = 'letivo'
+    `;
+
+    db.query(sqlDiasLetivos, (err, diasResult) => {
         if (err) return res.status(500).json({ erro: err.message });
-        if (userResult.length === 0) return res.status(404).json({ erro: 'Usuário não encontrado' });
 
-        const { turma, instituicao } = userResult[0];
+        const totalDiasLetivos = diasResult[0]?.total_dias || 0;
 
-        let instituicoes = instituicao === 'Sesi/Senai' ? ['Sesi', 'Senai'] : [instituicao];
+        const sqlDiasComFalta = `
+            SELECT COUNT(DISTINCT data) as dias_com_falta
+            FROM faltas
+            WHERE usuario_id = ?
+        `;
 
-        const placeholders = instituicoes.map(() => '?').join(',');
-        const sqlTurmas = `SELECT id FROM turmas WHERE nome = ? AND instituicao IN (${placeholders}) AND ano_letivo = YEAR(CURDATE())`;
-        db.query(sqlTurmas, [turma, ...instituicoes], (err, turmasResult) => {
+        db.query(sqlDiasComFalta, [usuario_id], (err, faltasResult) => {
             if (err) return res.status(500).json({ erro: err.message });
-            if (turmasResult.length === 0) return res.json([]);
 
-            const turmaIds = turmasResult.map(t => t.id);
-            const placeholdersTurmas = turmaIds.map(() => '?').join(',');
+            const diasComFalta = faltasResult[0]?.dias_com_falta || 0;
+            const diasPresentes = totalDiasLetivos - diasComFalta;
 
-            const sqlAulasPorSemana = `
-                SELECT COUNT(*) as total_aulas_semana
-                FROM aulas
-                WHERE turma_id IN (${placeholdersTurmas})
-            `;
-            db.query(sqlAulasPorSemana, turmaIds, (err, aulasResult) => {
-                if (err) return res.status(500).json({ erro: err.message });
-                const aulasPorSemana = aulasResult[0]?.total_aulas_semana || 0;
-
-                const sqlFaltasMes = `
-                    SELECT 
-                        DATE_FORMAT(data, '%Y-%m') as mes,
-                        COUNT(*) as total_faltas
-                    FROM faltas
-                    WHERE usuario_id = ?
-                        AND data >= DATE_SUB(CURDATE(), INTERVAL 4 MONTH)
-                    GROUP BY DATE_FORMAT(data, '%Y-%m')
-                    ORDER BY mes ASC
-                `;
-                db.query(sqlFaltasMes, [usuarioId], (err, faltasResult) => {
-                    if (err) return res.status(500).json({ erro: err.message });
-
-                    const meses = [];
-                    const mesesNomes = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-
-                    for (let i = 3; i >= 0; i--) {
-                        const data = new Date();
-                        data.setMonth(data.getMonth() - i);
-                        const mesAno = `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, '0')}`;
-                        const mesNome = mesesNomes[data.getMonth()];
-
-                        const faltasMes = faltasResult.find(f => f.mes === mesAno)?.total_faltas || 0;
-                        const aulasMes = aulasPorSemana * 4;
-                        const presencasMes = Math.max(0, aulasMes - faltasMes);
-                        const frequenciaMes = aulasMes > 0 ? Math.round((presencasMes / aulasMes) * 100) : 0;
-
-                        meses.push({
-                            mes: mesNome,
-                            mesAno: mesAno,
-                            frequencia: frequenciaMes,
-                            faltas: faltasMes,
-                            totalAulas: aulasMes
-                        });
-                    }
-
-                    res.json(meses);
-                });
+            res.json({
+                totalDiasLetivos,
+                diasComFalta,
+                diasPresentes,
+                frequencia: totalDiasLetivos > 0
+                    ? Math.round((diasPresentes / totalDiasLetivos) * 100)
+                    : 0
             });
         });
     });
 });
 
-// ===== ROTA PARA O CALENDÁRIO DO MÊS =====
+// ===== FREQUÊNCIA MENSAL (CÁLCULO REAL) =====
+app.get('/frequencia-mensal/:usuario_id', (req, res) => {
+    const usuarioId = req.params.usuario_id;
+
+    // Buscar últimas 4 meses
+    const meses = [];
+    const mesesNomes = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+
+    for (let i = 3; i >= 0; i--) {
+        const data = new Date();
+        data.setMonth(data.getMonth() - i);
+        const ano = data.getFullYear();
+        const mes = data.getMonth() + 1;
+        meses.push({
+            ano,
+            mes,
+            mesAno: `${ano}-${String(mes).padStart(2, '0')}`,
+            mesNome: mesesNomes[data.getMonth()]
+        });
+    }
+
+    let resultados = [];
+    let processados = 0;
+
+    meses.forEach((m) => {
+        // 1. Contar dias letivos do mês
+        const sqlDiasLetivos = `
+            SELECT COUNT(*) as total_dias
+            FROM dias_letivos
+            WHERE YEAR(data) = ? AND MONTH(data) = ? AND tipo = 'letivo'
+        `;
+
+        db.query(sqlDiasLetivos, [m.ano, m.mes], (err, diasResult) => {
+            if (err) {
+                processados++;
+                if (processados === meses.length) finalizar();
+                return;
+            }
+
+            const totalDiasLetivos = diasResult[0]?.total_dias || 0;
+
+            // 2. Contar dias com falta do mês
+            const sqlFaltasMes = `
+                SELECT COUNT(DISTINCT data) as dias_com_falta
+                FROM faltas
+                WHERE usuario_id = ?
+                    AND YEAR(data) = ?
+                    AND MONTH(data) = ?
+            `;
+
+            db.query(sqlFaltasMes, [usuarioId, m.ano, m.mes], (err, faltasResult) => {
+                if (err) {
+                    processados++;
+                    if (processados === meses.length) finalizar();
+                    return;
+                }
+
+                const diasComFalta = faltasResult[0]?.dias_com_falta || 0;
+                const diasPresentes = totalDiasLetivos - diasComFalta;
+                const frequencia = totalDiasLetivos > 0
+                    ? Math.round((diasPresentes / totalDiasLetivos) * 100)
+                    : 100;
+
+                resultados.push({
+                    mes: m.mesNome,
+                    mesAno: m.mesAno,
+                    frequencia,
+                    faltas: diasComFalta,
+                    totalAulas: totalDiasLetivos
+                });
+
+                processados++;
+                if (processados === meses.length) finalizar();
+            });
+        });
+    });
+
+    function finalizar() {
+        res.json(resultados);
+    }
+});
+// ===== CALENDÁRIO DO MÊS (COM FERIADOS POR ESCRITO) =====
 app.get('/calendario/:usuario_id/:ano/:mes', (req, res) => {
     const { usuario_id, ano, mes } = req.params;
 
@@ -554,7 +661,26 @@ app.get('/calendario/:usuario_id/:ano/:mes', (req, res) => {
         if (err) return res.status(500).json({ erro: err.message });
 
         const sqlDiasLetivos = `
-            SELECT DAY(data) as dia, tipo
+            SELECT 
+                DAY(data) as dia, 
+                tipo,
+                CASE
+                    WHEN data = '2026-02-16' THEN 'Carnaval'
+                    WHEN data = '2026-02-17' THEN 'Carnaval'
+                    WHEN data = '2026-04-03' THEN 'Sexta-feira Santa'
+                    WHEN data = '2026-04-21' THEN 'Tiradentes'
+                    WHEN data = '2026-05-01' THEN 'Dia do Trabalhador'
+                    WHEN data = '2026-06-04' THEN 'Corpus Christi'
+                    WHEN data = '2026-09-07' THEN 'Independência do Brasil'
+                    WHEN data = '2026-10-12' THEN 'Nossa Senhora Aparecida'
+                    WHEN data = '2026-10-28' THEN 'Dia do Servidor Público'
+                    WHEN data = '2026-11-02' THEN 'Finados'
+                    WHEN data = '2026-11-15' THEN 'Proclamação da República'
+                    WHEN data = '2026-11-20' THEN 'Consciência Negra'
+                    WHEN data = '2026-12-25' THEN 'Natal'
+                    WHEN tipo = 'recesso' THEN 'Recesso Escolar'
+                    ELSE NULL
+                END as nome
             FROM dias_letivos
             WHERE YEAR(data) = ? AND MONTH(data) = ?
         `;
@@ -562,6 +688,7 @@ app.get('/calendario/:usuario_id/:ano/:mes', (req, res) => {
             if (err) return res.status(500).json({ erro: err.message });
 
             const dias = {};
+            const feriados = [];
 
             diasResult.forEach(d => {
                 const ehFuturo =
@@ -574,8 +701,14 @@ app.get('/calendario/:usuario_id/:ano/:mes', (req, res) => {
                         dias[d.dia] = 'presente';
                     } else if (d.tipo === 'feriado') {
                         dias[d.dia] = 'feriado';
+                        feriados.push({ dia: d.dia, nome: d.nome, tipo: 'feriado' });
                     } else if (d.tipo === 'recesso') {
                         dias[d.dia] = 'recesso';
+                        feriados.push({ dia: d.dia, nome: d.nome, tipo: 'recesso' });
+                    }
+                } else {
+                    if (d.tipo === 'feriado' || d.tipo === 'recesso') {
+                        feriados.push({ dia: d.dia, nome: d.nome, tipo: d.tipo });
                     }
                 }
             });
@@ -584,12 +717,12 @@ app.get('/calendario/:usuario_id/:ano/:mes', (req, res) => {
                 dias[f.dia] = 'falta';
             });
 
-            res.json(dias);
+            res.json({ dias, feriados });
         });
     });
 });
 
-// ===== ROTA PARA LISTAR NOTIFICAÇÕES DO USUÁRIO =====
+// ===== NOTIFICAÇÕES =====
 app.get('/notificacoes/:usuario_id', (req, res) => {
     const { usuario_id } = req.params;
 
@@ -606,7 +739,7 @@ app.get('/notificacoes/:usuario_id', (req, res) => {
     });
 });
 
-// ===== ROTA PARA MARCAR NOTIFICAÇÃO COMO LIDA =====
+// ===== MARCAR NOTIFICAÇÃO COMO LIDA =====
 app.put('/notificacoes/:id/lida', (req, res) => {
     const { id } = req.params;
 
@@ -615,122 +748,81 @@ app.put('/notificacoes/:id/lida', (req, res) => {
         res.json({ message: 'Notificação marcada como lida' });
     });
 });
-// ===== ROTA PARA LANÇAR FALTA EM DIA TODO =====
-app.post('/faltas-dia-todo', (req, res) => {
-    const { usuario_id, data, instituicao } = req.body;
+// ===== ROTA PARA VALIDAR SIMULAÇÃO =====
+app.post('/validar-simulacao', (req, res) => {
+    const { usuario_id, disciplina, data, instituicao } = req.body;
 
     if (!usuario_id || !data || !instituicao) {
-        return res.status(400).json({ erro: 'Usuário, data e instituição são obrigatórios' });
+        return res.status(400).json({ 
+            valido: false, 
+            motivo: 'Dados incompletos' 
+        });
     }
 
-    // 1. Descobrir o dia da semana da data
     const dataObj = new Date(data + 'T00:00:00');
     const diasSemana = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
     const diaSemana = diasSemana[dataObj.getDay()];
 
     if (diaSemana === 'Sábado' || diaSemana === 'Domingo') {
-        return res.status(400).json({ erro: 'Não há aulas nos fins de semana' });
+        return res.json({
+            valido: false,
+            motivo: `Não há aulas nos fins de semana. ${diaSemana} é fim de semana.`
+        });
     }
 
-    // 2. Buscar a turma do aluno
     db.query('SELECT turma FROM usuarios WHERE id = ?', [usuario_id], (err, userResult) => {
         if (err) return res.status(500).json({ erro: err.message });
         if (userResult.length === 0) return res.status(404).json({ erro: 'Usuário não encontrado' });
 
         const turma = userResult[0].turma;
 
-        // 3. Buscar as aulas daquele dia na grade
-        const sqlAulas = `
-            SELECT a.disciplina, a.bloco, a.horario_inicio, a.horario_fim
+        const sqlInstituicao = `
+            SELECT DISTINCT a.disciplina
             FROM aulas a
             JOIN turmas t ON a.turma_id = t.id
             WHERE t.nome = ? AND t.instituicao = ? AND t.ano_letivo = YEAR(CURDATE())
                 AND a.dia_semana = ?
-            ORDER BY a.bloco
         `;
 
-        db.query(sqlAulas, [turma, instituicao, diaSemana], (err, aulasResult) => {
+        db.query(sqlInstituicao, [turma, instituicao, diaSemana], (err, instResult) => {
             if (err) return res.status(500).json({ erro: err.message });
-            if (aulasResult.length === 0) {
-                return res.status(400).json({ erro: `Não há aulas de ${instituicao} nesse dia (${diaSemana})` });
+
+            if (instResult.length === 0) {
+                return res.json({
+                    valido: false,
+                    motivo: `A instituição ${instituicao} não tem aula na ${diaSemana} para a turma ${turma}.`
+                });
             }
 
-            // 4. Inserir uma falta para cada bloco
-            const faltas = aulasResult.map(aula => [
-                usuario_id,
-                aula.disciplina,
-                data,
-                `${aula.horario_inicio} - ${aula.horario_fim}`,
-                'Falta em dia todo',
-                instituicao
-            ]);
-
-            const sqlInsert = 'INSERT INTO faltas (usuario_id, disciplina, data, horario, justificativa, instituicao) VALUES ?';
-
-            db.query(sqlInsert, [faltas], (err, result) => {
-                if (err) return res.status(500).json({ erro: err.message });
-
-                // Notificação
-                criarNotificacao(
-                    usuario_id,
-                    'registro',
-                    '📝 Falta em dia todo registrada',
-                    `Sua falta em dia todo (${instituicao}) no dia ${data} foi registrada (${aulasResult.length} aulas).`
-                );
-
-                // Verificar alertas
-                verificarAlertas(usuario_id);
-
-                res.status(201).json({
-                    message: `${aulasResult.length} faltas lançadas com sucesso!`,
-                    total: aulasResult.length
+            if (disciplina === 'DIA_TODO') {
+                return res.json({
+                    valido: true,
+                    diaSemana,
+                    disciplinas: instResult.map(r => r.disciplina),
+                    totalAulas: instResult.length
                 });
-            });
-        });
-    });
-});
-// ===== ROTA PARA BUSCAR ESTATÍSTICAS DE DIAS =====
-app.get('/estatisticas/:usuario_id', (req, res) => {
-    const { usuario_id } = req.params;
+            }
 
-    // 1. Contar dias letivos que já passaram
-    const sqlDiasLetivos = `
-        SELECT COUNT(*) as total_dias
-        FROM dias_letivos
-        WHERE data <= CURDATE() AND tipo = 'letivo'
-    `;
-
-    db.query(sqlDiasLetivos, (err, diasResult) => {
-        if (err) return res.status(500).json({ erro: err.message });
-
-        const totalDiasLetivos = diasResult[0]?.total_dias || 0;
-
-        // 2. Contar dias com falta (agrupando por data)
-        const sqlDiasComFalta = `
-            SELECT COUNT(DISTINCT data) as dias_com_falta
-            FROM faltas
-            WHERE usuario_id = ?
-        `;
-
-        db.query(sqlDiasComFalta, [usuario_id], (err, faltasResult) => {
-            if (err) return res.status(500).json({ erro: err.message });
-
-            const diasComFalta = faltasResult[0]?.dias_com_falta || 0;
-            const diasPresentes = totalDiasLetivos - diasComFalta;
+            const disciplinasDoDia = instResult.map(r => r.disciplina);
+            
+            if (!disciplinasDoDia.includes(disciplina)) {
+                return res.json({
+                    valido: false,
+                    motivo: `A disciplina "${disciplina}" não tem aula na ${diaSemana} no ${instituicao}. As disciplinas desse dia são: ${disciplinasDoDia.join(', ')}.`
+                });
+            }
 
             res.json({
-                totalDiasLetivos,
-                diasComFalta,
-                diasPresentes,
-                frequencia: totalDiasLetivos > 0 
-                    ? Math.round((diasPresentes / totalDiasLetivos) * 100) 
-                    : 0
+                valido: true,
+                diaSemana,
+                disciplinas: [disciplina],
+                totalAulas: 1
             });
         });
     });
 });
 
-// ===== INICIAR O SERVIDOR =====
+// ===== INICIAR SERVIDOR =====
 const PORT = 3000;
 app.listen(PORT, () => {
     console.log(`🚀 Servidor rodando na porta ${PORT}`);

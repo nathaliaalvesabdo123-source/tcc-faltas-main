@@ -39,8 +39,24 @@ function Login({ mudarTela }) {
       const data = await response.json();
 
       if (response.ok) {
-        // Salva os dados do usuário no localStorage
-        localStorage.setItem('usuario', JSON.stringify(data));
+        // ✅ VERIFICA SE O USUÁRIO TEM ID
+        if (!data.id) {
+          setErro('Erro: usuário sem ID. Contate o suporte.');
+          setCarregando(false);
+          return;
+        }
+
+        // ✅ SALVA O USUÁRIO COMPLETO NO LOCALSTORAGE
+        localStorage.setItem('usuario', JSON.stringify({
+          id: data.id,
+          nome: data.nome,
+          email: data.email,
+          instituicao: data.instituicao,
+          turma: data.turma,
+          foto: data.foto || null
+        }));
+
+        // ✅ MUDA DE TELA
         mudarTela('dashboard');
       } else {
         setErro(data.erro || 'Email ou senha inválidos');
